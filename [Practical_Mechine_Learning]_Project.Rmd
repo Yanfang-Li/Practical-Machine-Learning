@@ -1,0 +1,81 @@
+---
+title: '[Practical Machine Learning] Project'
+author: "艳儿"
+date: "April 9, 2017"
+output: html_document
+---
+
+
+## Download Datasets from Websites
+
+To make prediction, we need firstly 
+download the training and testing data sets from website.
+```{r warning=FALSE, message=FALSE}
+library(dplyr)
+library(randomForest)
+library(caret)
+
+# download data sets
+setwd('/Users/Yanfang/Documents/Coursera/Notes/Data Science/Practical Machine Learning')
+if(!file.exists('data')) dir.create('data')
+trUrl <- 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv'
+teUrl <- 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv'
+download.file(trUrl, destfile = './data/pml_training.csv')
+download.file(teUrl, destfile = './data/pml_testing.csv')
+```
+
+## Read Data into R
+
+After downloading data sets from website, we should load data sets into R.
+```{r warning=FALSE, message=FALSE}
+# read data into R
+trData <- read.csv('./data/pml_training.csv', stringsAsFactors = FALSE, na.strings = c('', 'NA'))
+teData <- read.csv('./data/pml_testing.csv', stringsAsFactors =  FALSE, na.strings = c('', 'NA'))
+
+# Explore data analysis
+dim(trData)
+dim(teData)
+colnameTr <- colnames(trData)
+colnameTe <- colnames(teData)
+```
+
+## Delete Missing Observations and Remove None Relevant Variables
+
+Some features are not useful for prediciton and there exist many missing values in 
+data sets, so now we need do some feature enginering. 
+
+```{r warning=FALSE, message=FALSE}
+# check if colnames of training data and testing data match
+all(colnameTe[-c(1,2,160)] == colnameTe[-c(1, 2, 160)])
+# check if there exist NAs 
+#apply(trData, 2, function(x) sum(is.na(x)))
+colNa <- which(apply(trData, 2, function(x)sum(is.na(x))) >= 19216)
+colNa0 <- which(apply(trData, 2, function(x)sum(is.na(x))) > 0)
+length(colNa) == length(colNa0)
+
+# delete colname x,user_name and all colNa columns
+trData <- trData %>% select(-X, -user_name, -raw_timestamp_part_1, -raw_timestamp_part_2, 
+                            -new_window, -num_window, -cvtd_timestamp, -colNa)
+teData <- teData %>% select(-X, -user_name, -raw_timestamp_part_1, -raw_timestamp_part_2, 
+                            -new_window, -num_window, -cvtd_timestamp, -colNa)
+dim(trData)
+dim(teData)
+```
+## Build Random Forest Model and Make Prediction
+```{r message=FALSE, warning = FALSE}
+# build random forest model
+trData$classe <- as.factor(trData$classe)
+trainInx <- createDataPartition(trData$classe, p = 0.8, list = FALSE)
+trainData <- trData[trainInx, ]
+testData <- trData[-trainInx, ] 
+dim(trainData)
+dim(testData)
+
+rfObj <- randomForest(classe ~., data = trainData, importance = TRUE, ntree = 100)
+predY <- predict(rfObj, testData[,-53])
+sum(predY == testData$classe)/length(testData$classe)
+table(predY, testData$classe)
+predtestY <- predict(rfObj, teData[,-53])
+predtestY
+```
+
